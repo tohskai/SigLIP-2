@@ -1,0 +1,1 @@
+from .model_optimized import Siglip2SequenceVisionTransformerOptimized

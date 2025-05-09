@@ -1,0 +1,4 @@
+numpy
+torch
+triton
+jupyter
