@@ -6,6 +6,7 @@ import triton
 import triton.language as tl
 from triton.language.extra.libdevice import rsqrt
 
+
 def calculate_settings(n):
     # reference: https://github.com/unslothai/unsloth/blob/fd753fed99ed5f10ef8a9b7139588d9de9ddecfb/unsloth/kernels/utils.py#L43
 
@@ -263,34 +264,3 @@ class LigerLayerNormFunction(torch.autograd.Function):
         X, W, B, Mean, RSTD = ctx.saved_tensors
         DX, DW, DB = layer_norm_backward(dY, X, W, B, Mean, RSTD)
         return DX, DW, DB, None
-
-
-class LayerNormImproved(nn.Module):
-    def __init__(self, normalized_shape, eps=1e-5, elementwise_affine=True):
-        super().__init__()
-        if isinstance(normalized_shape, int):
-            normalized_shape = (normalized_shape,)
-        self.normalized_shape = tuple(normalized_shape)
-        self.eps = eps
-        self.elementwise_affine = elementwise_affine
-
-        if self.elementwise_affine:
-            self.weight = nn.Parameter(torch.ones(self.normalized_shape))
-            self.bias = nn.Parameter(torch.zeros(self.normalized_shape))
-        else:
-            self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
-
-    def forward(self, X):
-        # X: (..., *normalized_shape)
-        # Expand weight/bias to match X if necessary
-        if self.elementwise_affine:
-            W = self.weight
-            B = self.bias
-        else:
-            # fall back to ones/zeros without tracking gradients
-            W = torch.ones(self.normalized_shape, dtype=X.dtype, device=X.device)
-            B = torch.zeros(self.normalized_shape, dtype=X.dtype, device=X.device)
-
-        # torch.autograd.Function.apply takes the Function class itself as first arg
-        return LigerLayerNormFunction.apply(X, W, B, self.eps)

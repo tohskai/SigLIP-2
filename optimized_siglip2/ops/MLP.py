@@ -32,12 +32,6 @@ def gelu_grad(input):
     return cdf_grad * input + cdf
 
 
-# triton.heuristics can be used either standalone or
-# before triton.autotune, it cannot be used
-# after triton.autotune. This implies that
-# if triton.heuristics and triton.autotune are to be used together,
-# triton.heuristics must be used first.
-@triton.heuristics({"EVEN_K": lambda args: args["K"] % args["BLOCK_SIZE_K"] == 0})
 @triton.autotune(
     configs=[
         triton.Config({"BLOCK_SIZE": 64}, num_warps=2),
@@ -131,6 +125,7 @@ def gelu_func_backward_kernel(
     ],
     key=["M", "N", "K"],
 )
+@triton.heuristics({"EVEN_K": lambda args: args["K"] % args["BLOCK_SIZE_K"] == 0})
 @triton.jit
 def triton_matmul_kernel(
     a_ptr,
@@ -267,14 +262,3 @@ class LinearGelu(torch.autograd.Function):
         grad_b = grad_z.sum(dim=0) if ctx.needs_input_grad[2] else None
 
         return grad_x, grad_W, grad_b
-
-
-class MLPImproved(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        return self.fc2(LinearGelu.apply(hidden_states, self.fc1.weight, self.fc1.bias))

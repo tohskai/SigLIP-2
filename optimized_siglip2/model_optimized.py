@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
-from .ops.layer_norm import LayerNormImproved, MLPImproved
+from .ops import LigerLayerNormFunction, LinearGelu
 
 torch._inductor.config.realize_opcount_threshold = 500
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -18,6 +18,32 @@ torch_compile_options = {
     "trace.enabled": False,
     "triton.cudagraphs": False,
 }
+
+
+class LayerNormImproved(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6, bias=False, init_fn="ones"):
+        super().__init__()
+        assert init_fn in [
+            "ones",
+            "zeros",
+        ], f"init_fn must be either 'ones' or 'zeros', got {init_fn}"
+        self.hidden_size = hidden_size
+        self.eps = eps
+        self.weight = nn.Parameter(
+            torch.ones(hidden_size) if init_fn == "ones" else torch.zeros(hidden_size)
+        )
+        self.bias = nn.Parameter(
+            torch.randn(hidden_size) if bias else torch.zeros(hidden_size)
+        )
+        self.variance_epsilon = eps
+
+    def forward(self, hidden_states):
+        return LigerLayerNormFunction.apply(
+            hidden_states, self.weight, self.bias, self.variance_epsilon
+        )
+
+    def extra_repr(self):
+        return f"{self.hidden_size}, eps={self.eps}"
 
 
 def create_document_ids(seq_sizes: torch.Tensor, device: torch.device) -> torch.Tensor:
@@ -60,7 +86,7 @@ class Siglip2VisionConfig:
     num_patches: int = 256
 
 
-class Siglip2SequenceEmbeddings(nn.Module):
+class Siglip2SequenceEmbeddingsImproved(nn.Module):
     def __init__(self, config: Siglip2VisionConfig):
         super().__init__()
         self.config = config
@@ -137,7 +163,7 @@ class Siglip2SequenceEmbeddings(nn.Module):
         return embeddings
 
 
-class Siglip2Attention(nn.Module):
+class Siglip2AttentionImproved(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -158,7 +184,7 @@ class Siglip2Attention(nn.Module):
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
 
     # Adapted from Siglip2Attention.forward and transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward
-    def forward(self, hidden_states, output_attentions=False, block_mask=None):
+    def forward(self, hidden_states, block_mask=None, output_attentions=False):
         batch_size, seq_len, _ = hidden_states.size()
         # 1. Linear projections
         Q = self.q_proj(hidden_states)
@@ -185,18 +211,44 @@ class Siglip2Attention(nn.Module):
         return attn_output, None
 
 
-class Siglip2EncoderLayer(nn.Module):
+class MLPImproved(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        return self.fc2(LinearGelu.apply(hidden_states, self.fc1.weight, self.fc1.bias))
+
+
+class Siglip2MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.activation_fn = nn.GELU(approximate="tanh")
+        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        hidden_states = self.fc1(hidden_states)
+        hidden_states = self.activation_fn(hidden_states)
+        hidden_states = self.fc2(hidden_states)
+        return hidden_states
+
+
+class Siglip2EncoderLayerImproved(nn.Module):
     def __init__(self, config: Siglip2VisionConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
         self.self_attn = torch.compile(
-            Siglip2Attention(config), options=torch_compile_options
+            Siglip2AttentionImproved(config), options=torch_compile_options
         )
         self.layer_norm1 = torch.compile(
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
         )
-        self.mlp = torch.compile(MLPImproved(config), options=torch_compile_options)
+        self.mlp = torch.compile(Siglip2MLP(config), options=torch_compile_options)
         self.layer_norm2 = torch.compile(
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
@@ -226,12 +278,15 @@ class Siglip2EncoderLayer(nn.Module):
         return hidden_states
 
 
-class Siglip2Encoder(nn.Module):
+class Siglip2EncoderImproved(nn.Module):
     def __init__(self, config: Siglip2VisionConfig):
         super().__init__()
         self.config = config
         self.layers = nn.ModuleList(
-            [Siglip2EncoderLayer(config) for _ in range(config.num_hidden_layers)]
+            [
+                Siglip2EncoderLayerImproved(config)
+                for _ in range(config.num_hidden_layers)
+            ]
         )
 
     # Ignore copy
@@ -265,10 +320,10 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         super().__init__()
         self.config = config
         self.embeddings = torch.compile(
-            Siglip2SequenceEmbeddings(config), options=torch_compile_options
+            Siglip2SequenceEmbeddingsImproved(config), options=torch_compile_options
         )
         self.encoder = torch.compile(
-            Siglip2Encoder(config), options=torch_compile_options
+            Siglip2EncoderImproved(config), options=torch_compile_options
         )
         self.post_layernorm = torch.compile(
             LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps),

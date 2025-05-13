@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from optimized_siglip2.model_optimized import Siglip2SequenceVisionTransformerOptimized
+from optimized_siglip2 import Siglip2SequenceVisionTransformerOptimized
 from model import Siglip2SequenceVisionTransformer, Siglip2VisionConfig
 
 

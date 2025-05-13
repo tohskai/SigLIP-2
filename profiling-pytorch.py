@@ -3,7 +3,7 @@ import math
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from optimized_siglip2.model_optimized import (
+from optimized_siglip2 import (
     Siglip2SequenceVisionTransformerOptimized,
     Siglip2VisionConfig,
 )

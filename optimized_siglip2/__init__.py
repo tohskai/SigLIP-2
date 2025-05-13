@@ -1,1 +1,2 @@
-from .model_optimized import Siglip2SequenceVisionTransformerOptimized
+from .model_optimized import Siglip2SequenceVisionTransformerOptimized as Siglip2SequenceVisionTransformerOptimized
+from .model_optimized import Siglip2VisionConfig as Siglip2VisionConfig
