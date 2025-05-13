@@ -21,7 +21,7 @@ torch_compile_options = {
 
 
 class LayerNormImproved(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6, bias=False, init_fn="ones"):
+    def __init__(self, hidden_size, eps, bias=True, init_fn="ones"):
         super().__init__()
         assert init_fn in [
             "ones",
