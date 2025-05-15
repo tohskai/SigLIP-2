@@ -379,7 +379,7 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         )
 
         # Apply final layer normalization
-        self.post_layernorm(last_hidden_state, out=last_hidden_state)
+        last_hidden_state = self.post_layernorm(last_hidden_state, out=last_hidden_state)
 
         # Remove the pseudo batch dimension we added earlier
         last_hidden_state = last_hidden_state.squeeze(0)
