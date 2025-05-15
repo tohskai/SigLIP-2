@@ -2,7 +2,6 @@
 # https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/ops/triton/layer_norm.py
 
 import math
-from typing import Optional, List
 
 import torch
 import torch.nn.functional as F
@@ -10,6 +9,70 @@ from torch import Tensor
 
 import triton
 import triton.language as tl
+
+from typing import Optional, Callable, Iterable, Union
+
+from torch.library import custom_op, CustomOpDef
+from torch._library.triton import set_wrap_triton_enabled
+
+
+def triton_op(
+    name: str,
+    fn: Optional[Callable] = None,
+    /,
+    *,
+    mutates_args: Union[str, Iterable[str]],
+    schema: Optional[str] = None,
+    # If allow_decomposition=True, this matches torch.library.triton_op behavior. If set to False,
+    # then it behaves like torch.library.custom_op instead, which doesn't decompose the operator
+    # and so inductor can't trace inside.
+    allow_decomposition=True,
+) -> Callable:
+    def dec(fn: Callable[..., object]) -> CustomOpDef:
+        def backend_fn(*args, **kwargs):  # type: ignore[no-untyped-def]
+            # Optimization: we're passing regular Tensors into the triton kernel, so
+            # no need to go through HOP dispatch
+            with set_wrap_triton_enabled(False):
+                return fn(*args, **kwargs)
+
+        result = custom_op(
+            name,
+            backend_fn,
+            mutates_args=mutates_args,
+            # This is the only difference with the PyTorch implementation
+            schema=schema,
+        )
+        from torch._subclasses.functional_tensor import FunctionalTensorMode
+
+        # We require that the user pass us a function that is make_fx traceable,
+        # so we can just register it as the Fake/meta kernel.
+        result.register_fake(fn)
+
+        if allow_decomposition:
+            # We decompose the operator when FunctionalTensorMode is active.
+            # The goal is to decompose the operator in AOTDispatcher.
+            # - With torch.compile, this means that the backend (usually Inductor)
+            #   can see a call to the triton kernel(s) and so it can directly optimize
+            #   them by inlining them into the lowering process.
+            def functional_decomp(  # type: ignore[no-untyped-def]
+                mode, op, types, args, kwargs
+            ):
+                from torch.export._trace import custom_triton_ops_decomposition_disabled
+
+                if custom_triton_ops_decomposition_disabled():
+                    return mode.__torch_dispatch__(op, types, args, kwargs)
+                else:
+                    with mode:
+                        return fn(*args, **kwargs)
+
+            result.register_torch_dispatch(FunctionalTensorMode, functional_decomp)
+
+        return result
+
+    if fn is None:
+        return dec
+    else:
+        return dec(fn)
 
 
 def maybe_contiguous_lastdim(x):
@@ -359,6 +422,11 @@ def _layer_norm_fwd(
     return out, y1, mean, rstd, residual_out, seeds, dropout_mask, dropout_mask1
 
 
+@triton_op(
+    "flash_attn::layer_norm_fwd_impl",
+    mutates_args={"out", "residual_out"},
+    schema="(Tensor x, Tensor weight, Tensor bias, float eps, Tensor(a!) out, Tensor? residual, Tensor? x1, Tensor? weight1, Tensor? bias1, float dropout_p, Tensor? rowscale, bool zero_centered_weight, bool is_rms_norm, bool return_dropout_mask, Tensor(a!)? residual_out) -> (Tensor y1, Tensor mean, Tensor rstd, Tensor seeds, Tensor dropout_mask, Tensor dropout_mask1)",
+)
 def _layer_norm_fwd_impl(
     x: Tensor,
     weight: Tensor,
@@ -716,6 +784,12 @@ def _layer_norm_bwd(
     return dx, dw, db, dresidual_in, dx1, dw1, db1, y
 
 
+@triton_op(
+    "flash_attn::layer_norm_bwd_impl",
+    mutates_args={},
+    schema="(Tensor dy, Tensor x, Tensor weight, Tensor bias, float eps, Tensor mean, Tensor rstd, Tensor? dresidual, Tensor? dy1, Tensor? weight1, Tensor? bias1, Tensor? seeds, float dropout_p, Tensor? rowscale, bool has_residual, bool has_x1, bool zero_centered_weight, bool is_rms_norm, ScalarType? x_dtype, bool recompute_output) -> (Tensor dx, Tensor dw, Tensor db, Tensor dresidual_in, Tensor dx1, Tensor dw1, Tensor db1, Tensor y)",
+    allow_decomposition=False,  # Don't let torch.compile trace inside
+)
 def _layer_norm_bwd_impl(
     dy: Tensor,
     x: Tensor,
