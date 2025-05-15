@@ -1,5 +1,24 @@
 # SigLIP-2
 
+## Running the tests
+
+```bash
+python run_tests.py
+```
+
+## Running the profiler
+
+```bash
+python profile_siglip2.py \
+  --batch 64 \
+  --max-patches 1024 \
+  --dtype bf16 \
+  --device cuda \
+  --warmup-steps 10 \
+  --profile-steps 20 \
+  --trace-file bf16_trace.json.gz
+
+```
 ## Command-Line Arguments
 
 This script benchmarks and compares the original and optimized versions of the Siglip2 Vision Transformer.
