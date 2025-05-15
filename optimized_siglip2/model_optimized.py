@@ -267,9 +267,15 @@ class Siglip2EncoderLayerImproved(nn.Module):
         self.self_attn = torch.compile(
             Siglip2AttentionImproved(config), options=torch_compile_options
         )
-        self.layer_norm1 = LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
+        self.layer_norm1 = torch.compile(
+            LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
+            options=torch_compile_options,
+        )
         self.mlp = torch.compile(MLPImproved(config), options=torch_compile_options)
-        self.layer_norm2 = LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps)
+        self.layer_norm2 = torch.compile(
+            LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
+            options=torch_compile_options,
+        )
 
     # Ignore copy
     def forward(
@@ -342,7 +348,10 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         self.encoder = torch.compile(
             Siglip2EncoderImproved(config), options=torch_compile_options
         )
-        self.post_layernorm = LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps)
+        self.post_layernorm = torch.compile(
+            LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps),
+            options=torch_compile_options,
+        )
 
     def forward(self, packed_seq_patches: tuple[torch.Tensor, torch.Tensor]):
         seq_patches, token_grids = packed_seq_patches
@@ -370,7 +379,7 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         )
 
         # Apply final layer normalization
-        last_hidden_state = self.post_layernorm(last_hidden_state, out=last_hidden_state)
+        last_hidden_state = self.post_layernorm(last_hidden_state)
 
         # Remove the pseudo batch dimension we added earlier
         last_hidden_state = last_hidden_state.squeeze(0)
