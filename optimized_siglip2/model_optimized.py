@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
-from .ops import LigerLayerNormFunction, mlp_func
+from .ops import LigerLayerNormFunction, mlp_func, dropout_func
 
 torch._inductor.config.realize_opcount_threshold = 500
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -197,9 +197,7 @@ class Siglip2AttentionImproved(nn.Module):
         # (Dropout on attn weights handled via mask_mod or by post-dropout below)
         # 4. (Optional) Dropout on output
         if self.training and self.dropout > 0:
-            attn_per_head = nn.functional.dropout(
-                attn_per_head, p=self.dropout, training=True
-            )
+            attn_per_head = dropout_func(attn_per_head, p=self.dropout)
         # 5. Merge heads and project
         attn_output = attn_per_head.transpose(1, 2).reshape(
             batch_size, seq_len, self.embed_dim
@@ -217,7 +215,13 @@ class MLPImproved(nn.Module):
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        return mlp_func(hidden_states, self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias)
+        return mlp_func(
+            hidden_states,
+            self.fc1.weight,
+            self.fc1.bias,
+            self.fc2.weight,
+            self.fc2.bias,
+        )
 
 
 class Siglip2EncoderLayerImproved(nn.Module):
