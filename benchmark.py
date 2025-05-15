@@ -78,7 +78,7 @@ def benchmark_model(
 ):
     # Optionally JIT compile
     if compile_enabled and device.type == "cuda":
-        model = torch.compile(model, dynamic=True)
+        model = torch.compile(model)
     model.train()
 
     # Create an infinite iterator over the DataLoader
