@@ -1038,6 +1038,7 @@ class LayerNormFn(torch.autograd.Function):
             None,
         )
 
+
 def layer_norm_fn(
     x,
     weight,

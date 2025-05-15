@@ -62,7 +62,7 @@ class LayerNormImproved(nn.Module):
             residual=residual,
             x1=x1,
             weight1=weight1,
-            bias1=weight1,
+            bias1=bias1,
             eps=self.variance_epsilon,
             dropout_p=dropout_p,
             rowscale=rowscale,
@@ -379,7 +379,7 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         )
 
         # Apply final layer normalization
-        last_hidden_state = self.post_layernorm(last_hidden_state)
+        last_hidden_state = self.post_layernorm(last_hidden_state, out=last_hidden_state)
 
         # Remove the pseudo batch dimension we added earlier
         last_hidden_state = last_hidden_state.squeeze(0)
