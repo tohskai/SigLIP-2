@@ -1,63 +1,57 @@
 import torch
-import torch.nn as nn
+from torch import autograd
 import torch.nn.functional as F
-
 import triton
 import triton.language as tl
-
 from random import randrange
 
-@triton.autotune(
-    configs=[
-        triton.Config(kwargs={"BLOCK_SIZE": 64, "TILE_SIZE": 8}),
-        triton.Config(kwargs={"BLOCK_SIZE": 128, "TILE_SIZE": 7}),
-        triton.Config(kwargs={"BLOCK_SIZE": 256, "TILE_SIZE": 6}),
-        triton.Config(kwargs={"BLOCK_SIZE": 512, "TILE_SIZE": 5}),
-        triton.Config(kwargs={"BLOCK_SIZE": 1024, "TILE_SIZE": 4}),
-        triton.Config(kwargs={"BLOCK_SIZE": 2048, "TILE_SIZE": 3}),
-        triton.Config(kwargs={"BLOCK_SIZE": 4096, "TILE_SIZE": 2}),
-    ],
-    key=["n_elements"],
-)
+BLOCK_SIZE = 1024
+
+
 @triton.jit
-def _seeded_dropout(
-    x_ptr,
-    output_ptr,
-    n_elements,
-    p,
-    seed,
-    BLOCK_SIZE: tl.constexpr,
-    TILE_SIZE: tl.constexpr,
-):
-    pid = tl.program_id(axis=0) * TILE_SIZE
-    for _ in tl.static_range(0, TILE_SIZE):
-        pid += 1
-        block_start = pid * BLOCK_SIZE
-        offsets = block_start + tl.arange(0, BLOCK_SIZE)
-        # load data from x
-        mask = offsets < n_elements
-        x = tl.load(x_ptr + offsets, mask=mask)
-        # randomly prune it
-        random = tl.rand(seed, offsets)
-        x_keep = random > p
-        # write-back
-        output = tl.where(x_keep, x / (1 - p), 0.0)
-        tl.store(output_ptr + offsets, output, mask=mask)
+def _seeded_dropout(x_ptr, output_ptr, n_elements, p, seed, **meta):
+    BLOCK_SIZE = meta["BLOCK_SIZE"]
+    pid = tl.program_id(axis=0)
+    block_start = pid * BLOCK_SIZE * 4
+
+    off0 = block_start + BLOCK_SIZE * 0 + tl.arange(0, BLOCK_SIZE)
+    off1 = block_start + BLOCK_SIZE * 1 + tl.arange(0, BLOCK_SIZE)
+    off2 = block_start + BLOCK_SIZE * 2 + tl.arange(0, BLOCK_SIZE)
+    off3 = block_start + BLOCK_SIZE * 3 + tl.arange(0, BLOCK_SIZE)
+
+    mask0 = off0 < n_elements
+    mask1 = off1 < n_elements
+    mask2 = off2 < n_elements
+    mask3 = off3 < n_elements
+
+    x0 = tl.load(x_ptr + off0, mask=mask0)
+    x1 = tl.load(x_ptr + off1, mask=mask1)
+    x2 = tl.load(x_ptr + off2, mask=mask2)
+    x3 = tl.load(x_ptr + off3, mask=mask3)
+
+    r0, r1, r2, r3 = tl.random.rand4x(seed, off0)
+    keep0, keep1, keep2, keep3 = r0 > p, r1 > p, r2 > p, r3 > p
+
+    o0 = tl.where(keep0, x0 / (1 - p), 0.0)
+    o1 = tl.where(keep1, x1 / (1 - p), 0.0)
+    o2 = tl.where(keep2, x2 / (1 - p), 0.0)
+    o3 = tl.where(keep3, x3 / (1 - p), 0.0)
+
+    tl.store(output_ptr + off0, o0, mask=mask0)
+    tl.store(output_ptr + off1, o1, mask=mask1)
+    tl.store(output_ptr + off2, o2, mask=mask2)
+    tl.store(output_ptr + off3, o3, mask=mask3)
 
 
 def seeded_dropout(x, p, seed):
-    x = x.contiguous()
     output = torch.empty_like(x)
-    assert x.is_contiguous()
     n_elements = x.numel()
-    grid = lambda meta: (
-        triton.cdiv(n_elements, meta["BLOCK_SIZE"] * meta["TILE_SIZE"]),
-    )
-    _seeded_dropout[grid](x, output, n_elements, p, seed)
+    grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"] * 4),)
+    _seeded_dropout[grid](x, output, n_elements, p, seed, BLOCK_SIZE=BLOCK_SIZE)
     return output
 
 
-class ImprovedDropoutFunction(torch.autograd.Function):
+class dropout_(autograd.Function):
     @classmethod
     def forward(cls, ctx, x, p):
         seed = randrange(int(1e6))
@@ -72,4 +66,4 @@ class ImprovedDropoutFunction(torch.autograd.Function):
         return seeded_dropout(dy, p, seed), None
 
 
-dropout_func = ImprovedDropoutFunction.apply
+dropout_func = dropout_.apply
