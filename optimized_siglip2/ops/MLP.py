@@ -15,7 +15,7 @@ def gelu_approx(x):
 
     .. _GeLU: https://arxiv.org/pdf/1606.08415.pdf
     """
-    return 0.5 * x * (1.0 + tanh(0.79788456760809 * x * (1.0 + 0.044715 * x * x)))
+    return 0.5 * x * (1.0 + tanh(0.7978845608028654 * x * (1.0 + 0.044715 * x * x)))
 
 
 @triton.jit
