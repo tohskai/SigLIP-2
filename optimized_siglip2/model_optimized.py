@@ -212,8 +212,8 @@ class Siglip2AttentionImproved(nn.Module):
         self.scale = self.head_dim**-0.5
         self.dropout = config.attention_dropout
 
-        self.qkv_proj = nn.Linear(self.embed_dim, 3 * self.embed_dim)
-        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.qkv_proj = torch.compile(nn.Linear(self.embed_dim, 3 * self.embed_dim), options=torch_compile_options)
+        self.out_proj = torch.compile(nn.Linear(self.embed_dim, self.embed_dim), options=torch_compile_options)
 
     # Adapted from Siglip2Attention.forward and transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward
     def forward(self, hidden_states, block_mask=None, output_attentions=False):
