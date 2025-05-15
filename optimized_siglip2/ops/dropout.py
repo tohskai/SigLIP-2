@@ -73,4 +73,4 @@ class ImprovedDropoutFunction(torch.autograd.Function):
         return seeded_dropout(dy, p, seed), None
 
 
-dropout_func = ImprovedDropoutFunction.apply
+dropout_func = torch.compiler.disable(ImprovedDropoutFunction.apply)
