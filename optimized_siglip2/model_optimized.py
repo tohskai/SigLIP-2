@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
-from .ops import LigerLayerNormFunction, mlp_func, dropout_func
+from .ops import layer_norm_fn, mlp_func, dropout_func
 
 torch._inductor.config.realize_opcount_threshold = 500
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -37,9 +37,43 @@ class LayerNormImproved(nn.Module):
         )
         self.variance_epsilon = eps
 
-    def forward(self, hidden_states):
-        return LigerLayerNormFunction.apply(
-            hidden_states, self.weight, self.bias, self.variance_epsilon
+    def forward(
+        self,
+        hidden_states,
+        residual=None,
+        x1=None,
+        weight1=None,
+        bias1=None,
+        dropout_p=0.0,
+        rowscale=None,
+        prenorm=False,
+        residual_in_fp32=False,
+        zero_centered_weight=False,
+        is_rms_norm=False,
+        return_dropout_mask=False,
+        out_dtype=None,
+        out=None,
+        residual_out=None,
+    ):
+        return layer_norm_fn(
+            hidden_states,
+            self.weight,
+            self.bias,
+            residual=residual,
+            x1=x1,
+            weight1=weight1,
+            bias1=weight1,
+            eps=self.variance_epsilon,
+            dropout_p=dropout_p,
+            rowscale=rowscale,
+            prenorm=prenorm,
+            residual_in_fp32=residual_in_fp32,
+            zero_centered_weight=zero_centered_weight,
+            is_rms_norm=zero_centered_weight,
+            return_dropout_mask=return_dropout_mask,
+            out_dtype=out_dtype,
+            out=out,
+            residual_out=residual_out,
         )
 
     def extra_repr(self):
@@ -255,10 +289,8 @@ class Siglip2EncoderLayerImproved(nn.Module):
             hidden_states=hidden_states,
             block_mask=block_mask,
         )
-        hidden_states = residual + hidden_states
 
-        residual = hidden_states
-        hidden_states = self.layer_norm2(hidden_states)
+        hidden_states, residual = self.layer_norm2(hidden_states, residual=residual, prenorm=True)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
