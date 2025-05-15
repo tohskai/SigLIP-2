@@ -270,11 +270,13 @@ class Siglip2EncoderLayerImproved(nn.Module):
         self.layer_norm1 = torch.compile(
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
+            dynamic=False,
         )
         self.mlp = torch.compile(MLPImproved(config), options=torch_compile_options)
         self.layer_norm2 = torch.compile(
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
+            dynamic=False,
         )
 
     # Ignore copy
@@ -351,6 +353,7 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         self.post_layernorm = torch.compile(
             LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps),
             options=torch_compile_options,
+            dynamic=False,
         )
 
     def forward(self, packed_seq_patches: tuple[torch.Tensor, torch.Tensor]):
