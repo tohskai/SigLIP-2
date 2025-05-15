@@ -7,6 +7,7 @@ import triton.language as tl
 
 from triton.language.extra.cuda.libdevice import tanh
 
+
 @triton.jit
 def gelu_approx(x):
     """
@@ -16,43 +17,63 @@ def gelu_approx(x):
     """
     return 0.5 * x * (1.0 + tanh(0.79788456760809 * x * (1.0 + 0.044715 * x * x)))
 
+
 @triton.jit
 def gelu_approx_grad(x):
     # CREDITS: Fast implementation proposed in
     # https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/model/fused_bias_gelu.py#L30
     tanh_out = tanh(0.79788456 * x * (1 + 0.044715 * x * x))
-    return 0.5 * x * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * x * x)) + 0.5 * (
-        1 + tanh_out
-    )
+    return 0.5 * x * (
+        (1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * x * x)
+    ) + 0.5 * (1 + tanh_out)
+
 
 @triton.autotune(
     configs=[
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=3, num_warps=8
+            {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=3,
+            num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=3, num_warps=8
+            {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=3,
+            num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=5, num_warps=2
+            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=5,
+            num_warps=2,
         ),
         # good for int8
         triton.Config(
@@ -66,10 +87,14 @@ def gelu_approx_grad(x):
             num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 128, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 128, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 128, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 128, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
             {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 128, "SPLIT_K": 1},
@@ -77,16 +102,24 @@ def gelu_approx_grad(x):
             num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=5, num_warps=2
+            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=5,
+            num_warps=2,
         ),
     ],
     key=["CACHE_KEY_M", "CACHE_KEY_N", "CACHE_KEY_K"],
@@ -196,6 +229,7 @@ def kernel_linear_gelu_fwd(
     mask = (rm < M)[:, None] & (rn < N)[None, :]
     tl.store(C, acc)
 
+
 def triton_linear_gelu(
     x: torch.Tensor,
     weight: torch.Tensor,
@@ -212,20 +246,20 @@ def triton_linear_gelu(
         weight = weight.contiguous()
     bias = bias.contiguous() if bias is not None else None
 
-    assert (
-        x.dtype == weight.dtype
-    ), f"Input and weight must have the same dtype, got {x.dtype} and {weight.dtype}"
+    assert x.dtype == weight.dtype, (
+        f"Input and weight must have the same dtype, got {x.dtype} and {weight.dtype}"
+    )
     if bias is not None:
-        assert (
-            x.dtype == bias.dtype
-        ), f"Input and bias must have the same dtype, got {x.dtype} and {bias.dtype}"
-    assert (
-        x_reshaped.shape[1] == weight.shape[1]
-    ), f"Incompatible dimensions: {x_reshaped.shape} - {weight.shape}"
+        assert x.dtype == bias.dtype, (
+            f"Input and bias must have the same dtype, got {x.dtype} and {bias.dtype}"
+        )
+    assert x_reshaped.shape[1] == weight.shape[1], (
+        f"Incompatible dimensions: {x_reshaped.shape} - {weight.shape}"
+    )
 
-    assert (
-        bias is None or bias.shape[0] == weight.shape[0]
-    ), "Incompatible dimensions in between weight and bias"
+    assert bias is None or bias.shape[0] == weight.shape[0], (
+        "Incompatible dimensions in between weight and bias"
+    )
 
     M, K = x_reshaped.shape
     N, K = weight.shape
@@ -233,7 +267,9 @@ def triton_linear_gelu(
     output = torch.empty((M, N), device=x.device, dtype=x.dtype)
     act_input = torch.empty_like(output) if save_act_input else None
 
-    grid = lambda META: (triton.cdiv(M, META["BLOCK_M"]) * triton.cdiv(N, META["BLOCK_N"]),)  # noqa
+    grid = lambda META: (
+        triton.cdiv(M, META["BLOCK_M"]) * triton.cdiv(N, META["BLOCK_N"]),
+    )  # noqa
 
     kernel_linear_gelu_fwd[grid](
         output,
@@ -267,34 +303,53 @@ def triton_linear_gelu(
             act_input.reshape(*batch_shape, act_input.shape[-1]),
         )
 
+
 @triton.autotune(
     configs=[
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=3, num_warps=8
+            {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=3,
+            num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=3, num_warps=8
+            {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=3,
+            num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1}, num_stages=5, num_warps=2
+            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 32, "SPLIT_K": 1},
+            num_stages=5,
+            num_warps=2,
         ),
         # good for int8
         triton.Config(
@@ -308,10 +363,14 @@ def triton_linear_gelu(
             num_warps=8,
         ),
         triton.Config(
-            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 128, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 256, "BLOCK_N": 64, "BLOCK_K": 128, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 128, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 256, "BLOCK_K": 128, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
             {"BLOCK_M": 128, "BLOCK_N": 128, "BLOCK_K": 128, "SPLIT_K": 1},
@@ -319,16 +378,24 @@ def triton_linear_gelu(
             num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 64, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 64, "BLOCK_N": 128, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=4, num_warps=4
+            {"BLOCK_M": 128, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=4,
+            num_warps=4,
         ),
         triton.Config(
-            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1}, num_stages=5, num_warps=2
+            {"BLOCK_M": 64, "BLOCK_N": 32, "BLOCK_K": 64, "SPLIT_K": 1},
+            num_stages=5,
+            num_warps=2,
         ),
     ],
     key=["CACHE_KEY_M", "CACHE_KEY_N", "CACHE_KEY_K"],
@@ -421,10 +488,11 @@ def kernel_linear_gelu_bwd(
     mask = (rm < M)[:, None] & (rn < N)[None, :]
     tl.store(C, acc, mask=mask)
 
+
 def triton_linear_gelu_bwd(
     grad_output: torch.Tensor,
     weight: torch.Tensor,
-    act_input = None,
+    act_input=None,
 ) -> torch.Tensor:
     """
     Compute e = activation(grad_output @ weight + bias).
@@ -444,12 +512,12 @@ def triton_linear_gelu_bwd(
     if weight.stride(0) > 1 and weight.stride(1) > 1:
         weight = weight.contiguous()
 
-    assert (
-        grad_output.dtype == weight.dtype
-    ), f"grad_output and weight must have the same dtype, got {grad_output.dtype} and {weight.dtype}"
-    assert (
-        grad_output_reshaped.shape[1] == weight.shape[0]
-    ), f"Incompatible dimensions: {grad_output_reshaped.shape} - {weight.shape}"
+    assert grad_output.dtype == weight.dtype, (
+        f"grad_output and weight must have the same dtype, got {grad_output.dtype} and {weight.dtype}"
+    )
+    assert grad_output_reshaped.shape[1] == weight.shape[0], (
+        f"Incompatible dimensions: {grad_output_reshaped.shape} - {weight.shape}"
+    )
 
     # M, N, K in bwd are different from M, N, K in fwd
     M, K = grad_output_reshaped.shape
@@ -458,7 +526,9 @@ def triton_linear_gelu_bwd(
     grad_input = torch.empty((M, N), device=grad_output.device, dtype=grad_output.dtype)
 
     # 1D launch kernel where each block gets its own program.
-    grid = lambda META: (triton.cdiv(M, META["BLOCK_M"]) * triton.cdiv(N, META["BLOCK_N"]),)  # noqa
+    grid = lambda META: (
+        triton.cdiv(M, META["BLOCK_M"]) * triton.cdiv(N, META["BLOCK_N"]),
+    )  # noqa
 
     kernel_linear_gelu_bwd[grid](
         grad_input,
@@ -506,19 +576,30 @@ class FusedMLPFunction(torch.autograd.Function):
         batch_shape, n = x.shape[:-1], x.shape[-1]
         batch_dim = batch_shape.numel()
 
-        output1, act_input = triton_linear_gelu(x.reshape(batch_dim, n), weight1, bias1, save_act_input=True)
+        output1, act_input = triton_linear_gelu(
+            x.reshape(batch_dim, n), weight1, bias1, save_act_input=True
+        )
 
         grad_output = grad_output.reshape(batch_dim, grad_output.shape[-1])
         grad_weight2 = grad_output.t().matmul(output1)
-        grad_bias2   = grad_output.sum(dim=0)
+        grad_bias2 = grad_output.sum(dim=0)
 
-        grad_act_input = triton_linear_gelu_bwd(grad_output, weight2, act_input=act_input)
+        grad_act_input = triton_linear_gelu_bwd(
+            grad_output, weight2, act_input=act_input
+        )
 
         grad_input = grad_act_input.matmul(weight1)
         grad_weight1 = grad_act_input.t().matmul(x.reshape(batch_dim, n))
         grad_bias1 = grad_act_input.sum(dim=0)
 
-        return grad_input.reshape_as(x), grad_weight1, grad_bias1, grad_weight2, grad_bias2, None
+        return (
+            grad_input.reshape_as(x),
+            grad_weight1,
+            grad_bias1,
+            grad_weight2,
+            grad_bias2,
+            None,
+        )
 
 
 mlp_func = FusedMLPFunction.apply
