@@ -47,7 +47,7 @@ I tried to implement seeded dropout (we keep only the seed for rng, instead of m
 
 I fused qkv-layer in attention, so we could avoid kernel launch overhead.
 
-Stream-k didn’t lead to any gains as we have bias/activations after allmost every matmul. It was pretty much only performance penalty in my implementations. And there are also known [issues](https://github.com/triton-lang/triton/issues/1393)with it in triton.
+Stream-k didn’t lead to any gains as we have bias/activations after allmost every matmul. It was pretty much only performance penalty in my implementations. And there are also known [issues](https://github.com/triton-lang/triton/issues/1393) with it in triton.
 
 I ran some experiments with cuda.graphs and it was pretty impactful, but we are trying to stick to purely kernel performance gains. 
 
