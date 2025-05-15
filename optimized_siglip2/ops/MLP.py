@@ -511,7 +511,6 @@ class FusedMLPFunction(torch.autograd.Function):
         grad_output = grad_output.reshape(batch_dim, grad_output.shape[-1])
         grad_weight2 = grad_output.t().matmul(output1)
         grad_bias2   = grad_output.sum(dim=0)
-        grad_output1 = grad_output @ weight2
 
         grad_act_input = triton_linear_gelu_bwd(grad_output, weight2, act_input=act_input)
 
