@@ -342,10 +342,7 @@ class Siglip2SequenceVisionTransformerOptimized(nn.Module):
         self.encoder = torch.compile(
             Siglip2EncoderImproved(config), options=torch_compile_options
         )
-        self.post_layernorm = torch.compile(
-            LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps),
-            options=torch_compile_options,
-        )
+        self.post_layernorm = LayerNormImproved(config.hidden_size, eps=config.layer_norm_eps)
 
     def forward(self, packed_seq_patches: tuple[torch.Tensor, torch.Tensor]):
         seq_patches, token_grids = packed_seq_patches
