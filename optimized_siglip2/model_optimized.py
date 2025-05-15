@@ -178,18 +178,16 @@ class Siglip2AttentionImproved(nn.Module):
         self.scale = self.head_dim**-0.5
         self.dropout = config.attention_dropout
 
-        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim)
-        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim)
-        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.qkv_proj = nn.Linear(self.embed_dim, 3 * self.embed_dim)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
 
     # Adapted from Siglip2Attention.forward and transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward
     def forward(self, hidden_states, block_mask=None, output_attentions=False):
         batch_size, seq_len, _ = hidden_states.size()
         # 1. Linear projections
-        Q = self.q_proj(hidden_states)
-        K = self.k_proj(hidden_states)
-        V = self.v_proj(hidden_states)
+        qkv = self.qkv_proj(hidden_states)
+        Q, K, V = qkv.chunk(3, dim=-1)
+
         # 2. Reshape into [B, heads, seq_len, head_dim]
         Q = Q.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
         K = K.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
