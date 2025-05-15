@@ -8,6 +8,8 @@ from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
 from .ops import layer_norm_fn, mlp_func, dropout_func
 
+from functools import lru_cache
+
 torch._inductor.config.realize_opcount_threshold = 500
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -320,6 +322,7 @@ class Siglip2EncoderImproved(nn.Module):
     ):
         hidden_states = inputs_embeds
 
+        @lru_cache
         def document_mask(b, h, q_idx, kv_idx):
             return document_ids[q_idx] == document_ids[kv_idx]
 
