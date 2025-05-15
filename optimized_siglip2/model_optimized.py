@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
-from .ops import LigerLayerNormFunction, LinearGelu
+from .ops import LigerLayerNormFunction, mlp_func
 
 torch._inductor.config.realize_opcount_threshold = 500
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -217,22 +217,7 @@ class MLPImproved(nn.Module):
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        return self.fc2(LinearGelu.apply(hidden_states, self.fc1.weight, self.fc1.bias))
-
-
-class Siglip2MLP(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.activation_fn = nn.GELU(approximate="tanh")
-        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        hidden_states = self.fc1(hidden_states)
-        hidden_states = self.activation_fn(hidden_states)
-        hidden_states = self.fc2(hidden_states)
-        return hidden_states
+        return mlp_func(hidden_states, self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias)
 
 
 class Siglip2EncoderLayerImproved(nn.Module):
@@ -246,7 +231,7 @@ class Siglip2EncoderLayerImproved(nn.Module):
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
         )
-        self.mlp = torch.compile(Siglip2MLP(config), options=torch_compile_options)
+        self.mlp = torch.compile(MLPImproved(config), options=torch_compile_options)
         self.layer_norm2 = torch.compile(
             LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
             options=torch_compile_options,
