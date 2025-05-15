@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import triton
 import triton.language as tl
 
+from random import randrange
 
 @triton.autotune(
     configs=[
@@ -45,6 +46,7 @@ def _seeded_dropout(
 
 
 def seeded_dropout(x, p, seed):
+    x = x.contiguous()
     output = torch.empty_like(x)
     assert x.is_contiguous()
     n_elements = x.numel()
@@ -57,14 +59,14 @@ def seeded_dropout(x, p, seed):
 
 class ImprovedDropoutFunction(torch.autograd.Function):
     @classmethod
-    def forward(ctx, x, p):
-        seed = torch.randint(0, 1_000_000, (1,)).item()
+    def forward(cls, ctx, x, p):
+        seed = randrange(int(1e6))
         ctx.p = p
         ctx.seed = seed
         return seeded_dropout(x, p, seed)
 
     @classmethod
-    def backward(ctx, dy):
+    def backward(cls, ctx, dy):
         p = ctx.p
         seed = ctx.seed
         return seeded_dropout(dy, p, seed), None

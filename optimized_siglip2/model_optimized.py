@@ -231,8 +231,8 @@ class Siglip2AttentionImproved(nn.Module):
         # (Dropout on attn weights handled via mask_mod or by post-dropout below)
         # 4. (Optional) Dropout on output
         if self.training and self.dropout > 0:
-            attn_per_head = nn.functional.dropout(
-                attn_per_head, p=self.dropout, training=True
+            attn_per_head = dropout_func(
+                attn_per_head, self.dropout
             )
         # 5. Merge heads and project
         attn_output = attn_per_head.transpose(1, 2).reshape(
