@@ -290,7 +290,9 @@ class Siglip2EncoderLayerImproved(nn.Module):
             block_mask=block_mask,
         )
 
-        hidden_states, residual = self.layer_norm2(hidden_states, residual=residual, prenorm=True)
+        hidden_states, residual = self.layer_norm2(
+            hidden_states, residual=residual, prenorm=True
+        )
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
