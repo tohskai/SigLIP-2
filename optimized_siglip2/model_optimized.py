@@ -267,15 +267,9 @@ class Siglip2EncoderLayerImproved(nn.Module):
         self.self_attn = torch.compile(
             Siglip2AttentionImproved(config), options=torch_compile_options
         )
-        self.layer_norm1 = torch.compile(
-            LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
-            options=torch_compile_options,
-        )
+        self.layer_norm1 = LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
         self.mlp = torch.compile(MLPImproved(config), options=torch_compile_options)
-        self.layer_norm2 = torch.compile(
-            LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps),
-            options=torch_compile_options,
-        )
+        self.layer_norm2 = LayerNormImproved(self.embed_dim, eps=config.layer_norm_eps)
 
     # Ignore copy
     def forward(
