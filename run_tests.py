@@ -220,7 +220,7 @@ def test_encoder_layer(device, cfg, constant): ...
 
 
 def main():
-    constant = 20
+    constant = 200
     device = torch.device("cuda")
     cfg = Siglip2VisionConfig()
     cfg.attention_dropout = 0.0
