@@ -13,7 +13,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 
 torch_compile_options = {
     "epilogue_fusion": True,
-    "max_autotune": True,
+    "max_autotune": False,
     "shape_padding": True,
     "trace.enabled": False,
     "triton.cudagraphs": False,
